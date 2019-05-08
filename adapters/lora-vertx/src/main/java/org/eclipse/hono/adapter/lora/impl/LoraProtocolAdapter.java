@@ -91,6 +91,7 @@ public final class LoraProtocolAdapter extends AbstractVertxBasedHttpProtocolAda
     private static final String INVALID_PAYLOAD = "Invalid payload";
 
     private final List<LoraProvider> loraProviders = new ArrayList<>();
+    private final List<String> existingCommandSubscriptions = new ArrayList<>();
 
     private HonoClientBasedAuthProvider<UsernamePasswordCredentials> usernamePasswordAuthProvider;
     private HonoClientBasedAuthProvider<SubjectDnCredentials> clientCertAuthProvider;
@@ -207,6 +208,7 @@ public final class LoraProtocolAdapter extends AbstractVertxBasedHttpProtocolAda
                 if (LoraMessageType.UPLINK.equals(type)) {
                     final String payloadBase64 = provider.extractPayloadEncodedInBase64(loraMessage);
                     doUpload(ctx, gatewayDevice, deviceId, payloadBase64);
+                    subscribeToCommandsForDeviceIfRequired(ctx, gatewayDevice.getTenantId(), deviceId);
                 } else {
                     LOG.debug("Received message '{}' of type [{}] for device [{}], will discard message.", loraMessage,
                             type, deviceId);
@@ -226,6 +228,33 @@ public final class LoraProtocolAdapter extends AbstractVertxBasedHttpProtocolAda
             TracingHelper.logError(currentSpan, "Supplied credentials are not an instance of the user");
             handle401(ctx);
         }
+    }
+
+    private void subscribeToCommandsForDeviceIfRequired(RoutingContext ctx, String tenantId, String deviceId) {
+        if (ctx.failed())
+        {
+            LOG.debug("Context failed, will not subscribe for non successful uplink.");
+            return;
+        }
+
+        final List<String> commandEnabledTenants = loraCommandProperties.getCommandEnabledTenants();
+        if (commandEnabledTenants.contains(tenantId))
+        {
+            LOG.debug("Already subscribed to tenant {} on startup. Not subscribing again", tenantId);
+            return;
+        }
+
+        String tenantDevice = String.format("%s:%s", tenantId, deviceId);
+
+        if (existingCommandSubscriptions.contains(tenantDevice))
+        {
+            LOG.debug("Already subscribed to tenant [{}] and device [{}]. Not subscribing again", tenantId, deviceId);
+            return;
+        }
+
+        scheduleStartLoraCommandConsumer(tenantId, deviceId);
+
+        existingCommandSubscriptions.add(tenantDevice);
     }
 
     private Span getCurrentSpan(final RoutingContext ctx) {
@@ -299,27 +328,32 @@ public final class LoraProtocolAdapter extends AbstractVertxBasedHttpProtocolAda
         }
     }
 
-    private void scheduleStartLoraCommandConsumer(final String tenantId) {
-        LOG.info("Starting Lora command consumer for tenant '{}' ...", tenantId);
-        startLoraCommandConsumer(tenantId).recover(x -> {
-            LOG.error("Error starting initial Lora command consumer for tenant [{}], retry in {} ms", tenantId,
+    private void scheduleStartLoraCommandConsumer(final String tenantId, final String deviceId) {
+        LOG.info("Starting Lora command consumer for tenant '{}' and device '{}' ...", tenantId, deviceId);
+        startLoraCommandConsumer(tenantId, deviceId).recover(x -> {
+            LOG.error("Error starting lora command consumer for tenant [{}] and device [{}], retry in {} ms", tenantId, deviceId,
                     LORA_COMMAND_CONSUMER_RETRY_INTERVAL, x);
-            vertx.setTimer(LORA_COMMAND_CONSUMER_RETRY_INTERVAL, y -> scheduleStartLoraCommandConsumer(tenantId));
+            vertx.setTimer(LORA_COMMAND_CONSUMER_RETRY_INTERVAL, y -> scheduleStartLoraCommandConsumer(tenantId, deviceId));
             return Future.succeededFuture();
         });
     }
 
-    private Future<MessageConsumer> startLoraCommandConsumer(final String tenantId) {
+    private void scheduleStartLoraCommandConsumer(final String tenantId) {
+        LOG.info("Starting Lora command consumer for tenant '{}' ...", tenantId);
+        scheduleStartLoraCommandConsumer(tenantId, LORA_COMMAND_CONSUMER_DEVICE_ID);
+    }
 
+    private Future<MessageConsumer> startLoraCommandConsumer(final String tenantId, final String deviceId) {
         return getCommandConsumerFactory().createCommandConsumer(
                 tenantId,
-                LORA_COMMAND_CONSUMER_DEVICE_ID,
+                deviceId,
                 receivedCommandContext -> commandConsumer(tenantId, receivedCommandContext),
                 remoteClose -> {
                     LOG.info("Closing command consumer");
                 },
                 LORA_COMMAND_CONSUMER_RETRY_INTERVAL);
     }
+
 
     @Override
     protected void onStartupSuccess() {
