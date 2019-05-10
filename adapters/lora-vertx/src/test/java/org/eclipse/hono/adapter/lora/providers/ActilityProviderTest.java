@@ -13,18 +13,29 @@
 
 package org.eclipse.hono.adapter.lora.providers;
 
+import io.vertx.core.Vertx;
 import org.eclipse.hono.adapter.lora.LoraMessageType;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import io.vertx.core.json.JsonObject;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 
 /**
  * Verifies behavior of {@link ActilityProvider}.
  */
 public class ActilityProviderTest {
 
-    private final ActilityProvider provider = new ActilityProvider();
+    private ActilityProvider provider;
+
+    /**
+     * Sets up the fixture.
+     */
+    @Before
+    public void before() {
+        provider = new ActilityProvider();
+    }
 
     /**
      * Verifies that the extraction of the device id from a message is successful.

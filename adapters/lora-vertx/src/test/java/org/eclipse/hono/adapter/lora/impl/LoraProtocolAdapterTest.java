@@ -19,6 +19,7 @@ import static org.mockito.Mockito.*;
 
 import org.apache.qpid.proton.message.Message;
 import org.eclipse.hono.adapter.http.HttpProtocolAdapterProperties;
+import org.eclipse.hono.adapter.lora.LoraCommandProperties;
 import org.eclipse.hono.adapter.lora.LoraConstants;
 import org.eclipse.hono.adapter.lora.LoraMessageType;
 import org.eclipse.hono.adapter.lora.impl.LoraProtocolAdapter;
@@ -34,6 +35,9 @@ import org.mockito.ArgumentCaptor;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Verifies behavior of {@link LoraProtocolAdapter}.
@@ -62,6 +66,10 @@ public class LoraProtocolAdapterTest {
         }).when(this.adapter).uploadTelemetryMessage(any(), any(), any(), any(), any());
 
         when(this.adapter.getConfig()).thenReturn(new HttpProtocolAdapterProperties());
+
+        LoraCommandProperties commandProperties = spy(LoraCommandProperties.class);
+        when(commandProperties.getCommandEnabledTenants()).thenReturn(Arrays.asList(new String[] {TEST_TENANT_ID}));
+        this.adapter.setLoraCommandProperties(commandProperties);
     }
 
     /**
