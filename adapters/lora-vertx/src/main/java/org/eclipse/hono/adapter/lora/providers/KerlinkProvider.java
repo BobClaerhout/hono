@@ -32,6 +32,8 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
 import java.text.MessageFormat;
+import java.time.Instant;
+import java.util.Base64;
 
 /**
  * A LoRaWAN provider with API for Kerlink.
@@ -45,7 +47,6 @@ public class KerlinkProvider extends RestDownlinkProvider implements LoraProvide
     private static final Logger LOG = LoggerFactory.getLogger(LoraProtocolAdapter.class);
 
     private static final String HEADER_CONTENT_TYPE_KERLINK_JSON = "application/vnd.kerlink.iot-v1+json";
-
 
     private static final String API_PATH_GET_TOKEN = "/oss/application/login";
     private static final String API_PATH_TX_MESSAGE = "/oss/application/customers/{0}/clusters/{1}/endpoints/{2}/txMessages";
@@ -94,6 +95,12 @@ public class KerlinkProvider extends RestDownlinkProvider implements LoraProvide
         LOG.debug("Invoking downlink rest api using url '{}' for device '{}'", targetUrl, targetDevice);
 
         return targetUrl;
+    }
+
+    @Override
+    protected Instant GetTokenExpiryInstant(JsonObject apiResponse) {
+        final Long tokenExpiryString = apiResponse.getLong(getFieldExpiryDate());
+        return Instant.ofEpochMilli(tokenExpiryString);
     }
 
     @Override
@@ -219,4 +226,33 @@ public class KerlinkProvider extends RestDownlinkProvider implements LoraProvide
         return true;
     }
 
+    @Override
+    protected Future<JsonObject> requestApiTokenWithSecret(final JsonObject gatewayDevice, final JsonObject secret) {
+        final Future<JsonObject> result = Future.future();
+
+        final String loginUri = LoraUtils.getNormalizedProviderUrlFromGatewayDevice(gatewayDevice) + getDownlinkApiPathGetToken();
+
+        final String passwordBase64 = secret.getString(FIELD_LORA_CREDENTIAL_KEY);
+        final String password = new String(Base64.getDecoder().decode(passwordBase64));
+
+        final JsonObject loginRequestPayload = new JsonObject();
+        loginRequestPayload.put(getDownlinkFieldAuthLogin(), secret.getString(FIELD_LORA_CREDENTIAL_IDENTITY));
+        loginRequestPayload.put(getDownlinkFieldAuthPassword(), password);
+
+        LOG.debug("Going to obtain token for gateway device '{}' using url: '{}'",
+                gatewayDevice.getString(FIELD_PAYLOAD_DEVICE_ID), loginUri);
+
+        webClient.postAbs(loginUri).putHeader("content-type", getDownlinkContentType())
+                .sendJsonObject(loginRequestPayload, response -> {
+                    if (response.succeeded() && validateTokenResponse(response.result())) {
+                        result.complete(response.result().bodyAsJsonObject());
+                    } else {
+                        LOG.debug("Error obtaining token for gateway device '{}' using url: '{}'",
+                                gatewayDevice.getString(FIELD_PAYLOAD_DEVICE_ID), loginUri);
+                        result.fail(new LoraProviderDownlinkException("Could not get authentication token for provider",
+                                response.cause()));
+                    }
+                });
+        return result;
+    }
 }

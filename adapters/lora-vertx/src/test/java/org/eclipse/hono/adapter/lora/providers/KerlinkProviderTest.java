@@ -63,7 +63,6 @@ public class KerlinkProviderTest {
 
     private KerlinkProvider provider;
 
-
     private final Vertx vertx = Vertx.vertx();
 
     /**

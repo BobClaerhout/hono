@@ -34,7 +34,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 
 import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
@@ -60,7 +59,7 @@ public abstract class RestDownlinkProvider {
     private final ExpiringValueCache<String, String> sessionsCache;
     private int tokenPreemptiveInvalidationTimeInMs = DEFAULT_DOWNLINK_TOKEN_PREEMPTIVE_INVALIDATION_TIME_IN_MS;
 
-    private final WebClient webClient;
+    protected final WebClient webClient;
 
     public RestDownlinkProvider(final Vertx vertx, final CacheManager cacheManager, final String className) {
         this.cacheManager = cacheManager;
@@ -134,8 +133,7 @@ public abstract class RestDownlinkProvider {
                         gatewayDevice.getString(FIELD_PAYLOAD_DEVICE_ID), gatewayCredentials.getAuthId());
 
                 final String token = apiResponse.getString(getFieldToken());
-                final Long tokenExpiryString = apiResponse.getLong(getFieldExpiryDate());
-                final Instant tokenExpiry = Instant.ofEpochMilli(tokenExpiryString)
+                final Instant tokenExpiry = GetTokenExpiryInstant(apiResponse)
                         .minusMillis(getTokenPreemptiveInvalidationTimeInMs());
 
                 if (Instant.now().isBefore(tokenExpiry)) {
@@ -150,6 +148,8 @@ public abstract class RestDownlinkProvider {
             return Future.succeededFuture(bearerToken);
         }
     }
+
+    protected abstract Instant GetTokenExpiryInstant(JsonObject apiResponse);
 
     protected abstract String getFieldExpiryDate();
 
@@ -169,34 +169,7 @@ public abstract class RestDownlinkProvider {
         return requestApiTokenWithSecret(gatewayDevice, currentSecret);
     }
 
-    private Future<JsonObject> requestApiTokenWithSecret(final JsonObject gatewayDevice, final JsonObject secret) {
-        final Future<JsonObject> result = Future.future();
-
-        final String loginUri = LoraUtils.getNormalizedProviderUrlFromGatewayDevice(gatewayDevice) + getDownlinkApiPathGetToken();
-
-        final String passwordBase64 = secret.getString(FIELD_LORA_CREDENTIAL_KEY);
-        final String password = new String(Base64.getDecoder().decode(passwordBase64));
-
-        final JsonObject loginRequestPayload = new JsonObject();
-        loginRequestPayload.put(getDownlinkFieldAuthLogin(), secret.getString(FIELD_LORA_CREDENTIAL_IDENTITY));
-        loginRequestPayload.put(getDownlinkFieldAuthPassword(), password);
-
-        LOG.debug("Going to obtain token for gateway device '{}' using url: '{}'",
-                gatewayDevice.getString(FIELD_PAYLOAD_DEVICE_ID), loginUri);
-
-        webClient.postAbs(loginUri).putHeader("content-type", getDownlinkContentType())
-                .sendJsonObject(loginRequestPayload, response -> {
-                    if (response.succeeded() && validateTokenResponse(response.result())) {
-                        result.complete(response.result().bodyAsJsonObject());
-                    } else {
-                        LOG.debug("Error obtaining token for gateway device '{}' using url: '{}'",
-                                gatewayDevice.getString(FIELD_PAYLOAD_DEVICE_ID), loginUri);
-                        result.fail(new LoraProviderDownlinkException("Could not get authentication token for provider",
-                                response.cause()));
-                    }
-                });
-        return result;
-    }
+    protected abstract Future<JsonObject> requestApiTokenWithSecret(JsonObject gatewayDevice, JsonObject secret);
 
     private String getCachedTokenForGatewayDevice(final JsonObject gatewayDevice) {
         final String cacheId = getCacheIdForGatewayDevice(gatewayDevice);
@@ -222,7 +195,7 @@ public abstract class RestDownlinkProvider {
                 + LoraUtils.getLoraConfigFromLoraGatewayDevice(gatwayDevice).getString(FIELD_AUTH_ID);
     }
 
-    private boolean validateTokenResponse(final HttpResponse<Buffer> response) {
+    protected boolean validateTokenResponse(final HttpResponse<Buffer> response) {
         if (!LoraUtils.isHttpSuccessStatusCode(response.statusCode())) {
             LOG.debug("Received non success status code: '{}' from api.", response.statusCode());
             return false;
@@ -266,7 +239,7 @@ public abstract class RestDownlinkProvider {
         return true;
     }
 
-    int getTokenPreemptiveInvalidationTimeInMs() {
+    private int getTokenPreemptiveInvalidationTimeInMs() {
         return tokenPreemptiveInvalidationTimeInMs;
     }
 
