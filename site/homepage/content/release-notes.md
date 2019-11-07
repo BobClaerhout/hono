@@ -2,6 +2,12 @@
 title = "Release Notes"
 +++
 
+## 1.1.0
+
+### New Features
+
+* A lorawan provider for loriot has been added.
+
 ## 1.0.1
 
 ### Fixes & Enhancements
