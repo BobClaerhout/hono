@@ -2,6 +2,19 @@
 title = "Release Notes"
 +++
 
+<<<<<<< HEAD
+=======
+## 1.1.0 (not yet released)
+
+### New Features
+
+* The Sigfox and LoRaWAN adapters now report metrics analogously to the other protocol
+  adapters.
+* The (experimental) CoAP adapter now supports tracking of request processing using
+  OpenTracing.
+* A lorawan provider has been added for the loriot network provider.
+
+>>>>>>> 93cc5ce0b... Add loriot lora provider
 ## 1.0.1
 
 ### Fixes & Enhancements
