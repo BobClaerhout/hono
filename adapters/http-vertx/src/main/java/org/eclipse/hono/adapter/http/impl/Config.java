@@ -13,7 +13,9 @@
 
 package org.eclipse.hono.adapter.http.impl;
 
+import org.eclipse.hono.adapter.http.HttpAdapterMetrics;
 import org.eclipse.hono.adapter.http.HttpProtocolAdapterProperties;
+import org.eclipse.hono.adapter.http.MicrometerBasedHttpAdapterMetrics;
 import org.eclipse.hono.client.RequestResponseClientConfigProperties;
 import org.eclipse.hono.config.ClientConfigProperties;
 import org.eclipse.hono.service.AbstractAdapterConfig;
@@ -121,5 +123,15 @@ public class Config extends AbstractAdapterConfig {
         final ObjectFactoryCreatingFactoryBean factory = new ObjectFactoryCreatingFactoryBean();
         factory.setTargetBeanName(BEAN_NAME_VERTX_BASED_HTTP_PROTOCOL_ADAPTER);
         return factory;
+    }
+
+    /**
+     * Provides the adapter metrics instance to use.
+     * @param registry The meter registry to use.
+     * @return A new adapter metrics instance.
+     */
+    @Bean
+    public HttpAdapterMetrics adapterMetrics(final MeterRegistry registry) {
+        return new MicrometerBasedHttpAdapterMetrics(registry, vertx());
     }
 }
