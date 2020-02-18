@@ -47,6 +47,7 @@ public class FireflyProvider implements LoraProvider {
     private static final String FIELD_FIREFLY_PARSED_PACKET = "parsed_packet";
     private static final String FIELD_FIREFLY_FRAME_COUNT = "fcnt";
     private static final String FIELD_FIREFLY_BANDWIDTH = "bandwidth";
+    private static final String FIELD_FIREFLY_MIC_PASS = "mic_pass";
 
     @Override
     public String getProviderName() {
@@ -100,6 +101,9 @@ public class FireflyProvider implements LoraProvider {
         }
         if (dataRateJson.containsKey(FIELD_FIREFLY_FREQUENCY)) {
             returnMap.put(LoraConstants.FREQUENCY, dataRateJson.getDouble(FIELD_FIREFLY_FREQUENCY));
+        }
+        if (loraMessage.containsKey(FIELD_FIREFLY_MIC_PASS)) {
+            returnMap.put(LoraConstants.APP_PROPERTY_MIC, loraMessage.getBoolean(FIELD_FIREFLY_MIC_PASS));
         }
 
         final JsonObject parsedPacketJson = loraMessage.getJsonObject(FIELD_FIREFLY_PARSED_PACKET, new JsonObject());

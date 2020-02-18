@@ -16,7 +16,6 @@ package org.eclipse.hono.adapter.lora.impl;
 import javax.annotation.PostConstruct;
 
 import org.eclipse.hono.adapter.http.HttpAdapterMetrics;
-import org.eclipse.hono.adapter.http.HttpProtocolAdapterProperties;
 import org.eclipse.hono.adapter.http.MicrometerBasedHttpAdapterMetrics;
 import org.eclipse.hono.adapter.lora.LoraProtocolAdapterProperties;
 import org.eclipse.hono.client.RequestResponseClientConfigProperties;
@@ -48,7 +47,7 @@ public class Config extends AbstractAdapterConfig {
 
     @PostConstruct
     void validateConfiguration() {
-        final HttpProtocolAdapterProperties httpProtocolAdapterProperties = adapterProperties();
+        final LoraProtocolAdapterProperties httpProtocolAdapterProperties = adapterProperties();
         if (!httpProtocolAdapterProperties.isAuthenticationRequired()) {
             throw new IllegalStateException(
                     "LoRa Protocol Adapter does not support unauthenticated mode. Please change your configuration accordingly.");
